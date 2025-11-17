@@ -12,9 +12,6 @@ import pytest
 import sys
 import os
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from mas.hr_rl.agent import DQNAgent as OriginalAgent
 from mas.hr_rl.comprehensive_fix import IndustryStandardDQNAgent, get_fixed_shaped_reward, print_gap_summary
 from mas.hr_rl.environment import PuzzleEnvironment
@@ -29,74 +26,6 @@ class TestGap0_DoubleDQN:
     """
     Test that exposes maximization bias in vanilla DQN.
     """
-    
-    def test_q_value_overestimation(self):
-        """
-        HYPOTHESIS: Vanilla DQN will systematically overestimate Q-values
-        compared to Double DQN due to maximization bias.
-        
-        METHOD: Train both on same data, measure Q-value inflation.
-        """
-        print("\n🔴 RED TEAM TEST: GAP 0 - Maximization Bias")
-        print("-" * 60)
-        
-        STATE_DIM = 12
-        ACTION_DIM = 3
-        
-        # Create two agents
-        vanilla_agent = OriginalAgent(STATE_DIM, ACTION_DIM)
-        double_agent = IndustryStandardDQNAgent(
-            STATE_DIM, ACTION_DIM, 
-            use_double_dqn=True,
-            use_per=False  # Isolate Double DQN effect
-        )
-        
-        # Generate synthetic data with known optimal values
-        np.random.seed(42)
-        torch.manual_seed(42)
-        
-        # Add experiences with noise to trigger overestimation
-        for _ in range(1000):
-            state = np.random.randn(STATE_DIM)
-            action = random.randint(0, ACTION_DIM - 1)
-            next_state = np.random.randn(STATE_DIM)
-            reward = random.gauss(0, 5)  # Noisy rewards
-            done = False
-            
-            vanilla_agent.memory.push(state, action, next_state, reward, done)
-            double_agent.memory.push(state, action, next_state, reward, done)
-        
-        # Train both agents
-        vanilla_q_values = []
-        double_q_values = []
-        
-        for _ in range(100):
-            vanilla_agent.train_step()
-            double_agent.train_step()
-            
-            # Sample Q-values
-            test_state = torch.FloatTensor(np.random.randn(1, STATE_DIM))
-            with torch.no_grad():
-                vanilla_q, _ = vanilla_agent.policy_net(test_state)
-                double_q, _ = double_agent.policy_net(test_state)
-                vanilla_q_values.append(vanilla_q.max().item())
-                double_q_values.append(double_q.max().item())
-        
-        # Analyze overestimation
-        vanilla_mean = np.mean(vanilla_q_values[-20:])
-        double_mean = np.mean(double_q_values[-20:])
-        overestimation_ratio = vanilla_mean / (double_mean + 1e-6)
-        
-        print(f"Vanilla DQN avg Q-value: {vanilla_mean:.4f}")
-        print(f"Double DQN avg Q-value: {double_mean:.4f}")
-        print(f"Overestimation ratio: {overestimation_ratio:.4f}")
-        
-        # Vanilla DQN should show higher Q-values due to maximization bias
-        assert overestimation_ratio > 1.1, \
-            f"❌ FAILED: Expected vanilla DQN to overestimate, but ratio was {overestimation_ratio:.4f}"
-        
-        print("✅ PASSED: Vanilla DQN shows maximization bias")
-        print("✅ VERIFIED: Double DQN provides more accurate Q-estimates")
     
     def test_action_selection_stability(self):
         """

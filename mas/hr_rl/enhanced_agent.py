@@ -5,9 +5,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque, namedtuple
 
-from mas.hr_rl.model import HierarchicalQNetwork
-from mas.hr_rl.environment import PuzzleEnvironment
-from mas.hr_rl.core import get_hierarchical_state_representation, get_shaped_reward, decompose_target
+from .model import HierarchicalQNetwork
+from .environment import PuzzleEnvironment
+from .core import get_hierarchical_state_representation, get_shaped_reward, decompose_target
 
 # Enhanced transition structure with priority
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward', 'done'))
@@ -177,7 +177,7 @@ class EnhancedDQNAgent:
         if self.use_per:
             self.memory = PrioritizedReplayBuffer(buffer_size)
         else:
-            from mas.hr_rl.agent import ReplayBuffer
+            from .agent import ReplayBuffer
             self.memory = ReplayBuffer(buffer_size)
         
         # Reward normalization

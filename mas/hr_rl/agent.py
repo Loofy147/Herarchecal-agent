@@ -5,9 +5,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque, namedtuple
 
-from mas.hr_rl.model import HierarchicalQNetwork
-from mas.hr_rl.environment import PuzzleEnvironment
-from mas.hr_rl.core import get_hierarchical_state_representation, get_shaped_reward, decompose_target
+from .model import HierarchicalQNetwork
+from .environment import PuzzleEnvironment
+from .core import get_hierarchical_state_representation, get_shaped_reward, decompose_target
 
 # Define the structure for a single transition in the replay buffer
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward', 'done'))
@@ -93,6 +93,8 @@ class DQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        return loss.item()
 
     def update_target_network(self):
         """Performs a soft update of the target network's weights."""
