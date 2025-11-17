@@ -21,12 +21,12 @@ import os
 from datetime import datetime
 import pickle
 
-from mas.hr_rl.model import HierarchicalQNetwork
-from mas.hr_rl.environment import PuzzleEnvironment
-from mas.hr_rl.core import get_hierarchical_state_representation, decompose_target
+from model import HierarchicalQNetwork
+from environment import PuzzleEnvironment
+from core import get_hierarchical_state_representation, decompose_target
 
 # Import the PER components from enhanced_agent
-from mas.hr_rl.enhanced_agent import SumTree, PrioritizedReplayBuffer, RewardNormalizer
+from enhanced_agent import SumTree, PrioritizedReplayBuffer, RewardNormalizer
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward', 'done'))
 
@@ -251,7 +251,7 @@ class IndustryStandardDQNAgent:
             transitions, idxs, is_weights = self.memory.sample(self.batch_size)
             is_weights = torch.FloatTensor(is_weights).unsqueeze(1)
         else:
-            transitions = self.memory.sample(self.batch_size)
+            transitions, _, _ = self.memory.sample(self.batch_size)
             idxs = None
             is_weights = torch.ones(self.batch_size, 1)
 
