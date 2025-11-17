@@ -20,13 +20,14 @@ import json
 import os
 from datetime import datetime
 import pickle
+import logging
 
-from mas.hr_rl.model import HierarchicalQNetwork
-from mas.hr_rl.environment import PuzzleEnvironment
-from mas.hr_rl.core import get_hierarchical_state_representation, decompose_target
+from .model import HierarchicalQNetwork
+from .environment import PuzzleEnvironment
+from .core import get_hierarchical_state_representation, decompose_target
 
 # Import the PER components from enhanced_agent
-from mas.hr_rl.enhanced_agent import SumTree, PrioritizedReplayBuffer, RewardNormalizer
+from .enhanced_agent import SumTree, PrioritizedReplayBuffer, RewardNormalizer
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward', 'done'))
 
@@ -187,10 +188,10 @@ class IndustryStandardDQNAgent:
         self.use_per = use_per
         if use_per:
             self.memory = PrioritizedReplayBuffer(buffer_size)
-            print("✅ Using Prioritized Experience Replay")
+            logging.info("✅ Using Prioritized Experience Replay")
         else:
             self.memory = ReplayBuffer(buffer_size)
-            print("⚠️ Using standard uniform replay")
+            logging.warning("⚠️ Using standard uniform replay")
         
         # GAP 5: Checkpoint system
         self.checkpoint_dir = checkpoint_dir
@@ -206,18 +207,14 @@ class IndustryStandardDQNAgent:
         
         self.total_steps = 0
         
-        print(f"🚀 Agent initialized:")
-        print(f"   - Double DQN: {self.use_double_dqn}")
-        print(f"   - PER: {self.use_per}")
-        print(f"   - Gradient Clip: {self.gradient_clip}")
-        print(f"   - Checkpoint Dir: {self.checkpoint_dir}")
+        logging.info(f"🚀 Agent initialized: Double DQN={self.use_double_dqn}, PER={self.use_per}, Gradient Clip={self.gradient_clip}, Checkpoint Dir={self.checkpoint_dir}")
 
     def set_curriculum_stage(self, stage):
         """
         GAP 2: Update curriculum stage for adaptive exploration.
         """
         self.curriculum_stage = stage
-        print(f"📚 Curriculum stage updated to {stage}")
+        logging.info(f"📚 Curriculum stage updated to {stage}")
 
     def select_action(self, state):
         """
@@ -308,7 +305,7 @@ class IndustryStandardDQNAgent:
         
         # Check gradients before clipping
         if not self.monitor.check_gradients(self.policy_net):
-            print("⚠️ Skipping update due to gradient anomaly")
+            logging.warning("⚠️ Skipping update due to gradient anomaly")
             return None
         
         # Clip gradients to prevent explosion
@@ -327,7 +324,7 @@ class IndustryStandardDQNAgent:
         # Monitor training health
         loss_value = weighted_loss.item()
         if not self.monitor.check_loss(loss_value):
-            print("⚠️ Loss anomaly detected")
+            logging.warning("⚠️ Loss anomaly detected")
         
         self.total_steps += 1
         
@@ -386,7 +383,7 @@ class IndustryStandardDQNAgent:
         if is_best:
             best_path = os.path.join(self.checkpoint_dir, 'best_model.pt')
             torch.save(checkpoint, best_path)
-            print(f"💾 New best model saved! Reward: {reward:.2f}")
+            logging.info(f"💾 New best model saved! Reward: {reward:.2f}")
         
         # Save training history
         history_path = os.path.join(self.checkpoint_dir, 'training_history.json')
@@ -409,9 +406,7 @@ class IndustryStandardDQNAgent:
         self.total_steps = checkpoint['total_steps']
         self.training_history = checkpoint['training_history']
         
-        print(f"✅ Checkpoint loaded from episode {checkpoint['episode']}")
-        print(f"   Reward: {checkpoint['reward']:.2f}")
-        print(f"   Timestamp: {checkpoint['timestamp']}")
+        logging.info(f"✅ Checkpoint loaded from episode {checkpoint['episode']} with reward {checkpoint['reward']:.2f}")
         
         return checkpoint
 
@@ -448,8 +443,7 @@ class ReplayBuffer:
         self.memory.append(Transition(*args))
 
     def sample(self, batch_size):
-        transitions = random.sample(self.memory, batch_size)
-        return transitions, None, None
+        return random.sample(self.memory, batch_size)
 
     def __len__(self):
         return len(self.memory)
@@ -460,30 +454,10 @@ class ReplayBuffer:
 # ============================================================================
 def print_gap_summary():
     """Print summary of all fixes."""
-    print("\n" + "="*70)
-    print("🎯 INDUSTRY-STANDARD RL SYSTEM - ALL GAPS FIXED")
-    print("="*70)
-    print("\n✅ GAP 0: Double DQN")
-    print("   └─ Eliminates maximization bias in Q-value estimation")
-    print("   └─ 20-30% performance improvement proven in benchmarks")
-    
-    print("\n✅ GAP 1: Gradient Clipping + Loss Monitoring")
-    print("   └─ Prevents training collapse from exploding gradients")
-    print("   └─ NaN/Inf detection with automatic error handling")
-    
-    print("\n✅ GAP 2: Curriculum-Aware Adaptive Exploration")
-    print("   └─ Stage-specific epsilon multipliers")
-    print("   └─ More exploration early, more exploitation late")
-    
-    print("\n✅ GAP 3: Fixed Reward Engineering")
-    print("   └─ Proper incentive ordering: failure < success")
-    print("   └─ Normalized terminal rewards prevent perverse incentives")
-    
-    print("\n✅ GAP 4: Prioritized Experience Replay (PER)")
-    print("   └─ 30-50% faster convergence (Schaul et al., 2015)")
-    print("   └─ Focus on high-value learning opportunities")
-    
-    print("\n✅ GAP 5: Complete Checkpoint System")
-    print("   └─ Model persistence with metadata")
-    print("   └─ Best model tracking & training resumption")
-    print("="*70 + "\n")
+    logging.info("🎯 INDUSTRY-STANDARD RL SYSTEM - ALL GAPS FIXED")
+    logging.info("✅ GAP 0: Double DQN - Eliminates maximization bias in Q-value estimation")
+    logging.info("✅ GAP 1: Gradient Clipping + Loss Monitoring - Prevents training collapse from exploding gradients")
+    logging.info("✅ GAP 2: Curriculum-Aware Adaptive Exploration - Stage-specific epsilon multipliers")
+    logging.info("✅ GAP 3: Fixed Reward Engineering - Proper incentive ordering: failure < success")
+    logging.info("✅ GAP 4: Prioritized Experience Replay (PER) - 30-50% faster convergence")
+    logging.info("✅ GAP 5: Complete Checkpoint System - Model persistence with metadata")

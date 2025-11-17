@@ -9,6 +9,9 @@ import random
 import numpy as np
 import torch
 import time
+import json
+import logging
+import csv
 from datetime import datetime
 
 from mas.hr_rl.comprehensive_fix import (
@@ -20,45 +23,42 @@ from mas.hr_rl.environment import PuzzleEnvironment
 from mas.hr_rl.core import get_hierarchical_state_representation, decompose_target
 
 
+def load_config(config_path='config.json'):
+    """Loads configuration from a JSON file."""
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+
+def log_experiment(config, metrics, checkpoint_path):
+    """Logs the results of an experiment to a CSV file."""
+    with open('experiments.csv', 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            int(time.time()),
+            datetime.now().isoformat(),
+            'Jules',
+            'main',
+            'PuzzleEnvironment',
+            json.dumps(config['agent']),
+            42,
+            json.dumps(metrics),
+            checkpoint_path
+        ])
+
+
 def train_production_agent():
     """
     Production-grade training with all fixes and comprehensive monitoring.
     """
-    print("\n" + "="*70)
-    print("🚀 PRODUCTION TRAINING - INDUSTRY-STANDARD RL SYSTEM")
-    print("="*70)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.info("🚀 PRODUCTION TRAINING - INDUSTRY-STANDARD RL SYSTEM")
     
     print_gap_summary()
     
     # ========================================================================
     # CONFIGURATION
     # ========================================================================
-    CONFIG = {
-        'training_episodes': 5000,
-        'state_dim': 12,
-        'action_dim': 3,
-        'max_steps_per_episode': 200,
-        
-        # Agent hyperparameters (tuned for production)
-        'learning_rate': 0.0005,
-        'gamma': 0.99,
-        'epsilon_start': 1.0,
-        'epsilon_end': 0.01,
-        'epsilon_decay': 0.995,
-        'buffer_size': 50000,  # Larger buffer for better PER
-        'batch_size': 64,
-        'tau': 0.005,
-        
-        # Feature flags (all enabled for production)
-        'use_double_dqn': True,
-        'use_per': True,
-        'gradient_clip': 10.0,
-        
-        # Monitoring & checkpointing
-        'checkpoint_interval': 100,  # Save every 100 episodes
-        'eval_interval': 50,  # Evaluate every 50 episodes
-        'log_interval': 10,   # Log every 10 episodes
-    }
+    CONFIG = load_config()
     
     # ========================================================================
     # CURRICULUM DESIGN (from paper)
@@ -73,24 +73,31 @@ def train_production_agent():
     # ========================================================================
     # INITIALIZE AGENT
     # ========================================================================
-    print(f"\n📋 Configuration:")
+    logging.info("📋 Configuration:")
     for key, value in CONFIG.items():
-        print(f"   {key}: {value}")
+        if isinstance(value, dict):
+            logging.info(f"   {key}:")
+            for sub_key, sub_value in value.items():
+                logging.info(f"     {sub_key}: {sub_value}")
+        else:
+            logging.info(f"   {key}: {value}")
+
+    agent_config = CONFIG['agent']
     
     agent = IndustryStandardDQNAgent(
         state_dim=CONFIG['state_dim'],
         action_dim=CONFIG['action_dim'],
-        learning_rate=CONFIG['learning_rate'],
-        gamma=CONFIG['gamma'],
-        epsilon_start=CONFIG['epsilon_start'],
-        epsilon_end=CONFIG['epsilon_end'],
-        epsilon_decay=CONFIG['epsilon_decay'],
-        buffer_size=CONFIG['buffer_size'],
-        batch_size=CONFIG['batch_size'],
-        tau=CONFIG['tau'],
-        use_double_dqn=CONFIG['use_double_dqn'],
-        use_per=CONFIG['use_per'],
-        gradient_clip=CONFIG['gradient_clip'],
+        learning_rate=agent_config['learning_rate'],
+        gamma=agent_config['gamma'],
+        epsilon_start=agent_config['epsilon_start'],
+        epsilon_end=agent_config['epsilon_end'],
+        epsilon_decay=agent_config['epsilon_decay'],
+        buffer_size=agent_config['buffer_size'],
+        batch_size=agent_config['batch_size'],
+        tau=agent_config['tau'],
+        use_double_dqn=agent_config['use_double_dqn'],
+        use_per=agent_config['use_per'],
+        gradient_clip=agent_config['gradient_clip'],
         checkpoint_dir='production_checkpoints'
     )
     
@@ -118,9 +125,7 @@ def train_production_agent():
             current_curriculum = curriculum[episode]
             current_stage = list(curriculum.keys()).index(episode)
             agent.set_curriculum_stage(current_stage)
-            print(f"\n{'='*70}")
-            print(f"📚 Episode {episode}: {current_curriculum['name']}")
-            print(f"{'='*70}")
+            logging.info(f"📚 Episode {episode}: {current_curriculum['name']}")
         
         # ====================================================================
         # EPISODE SETUP
@@ -257,7 +262,7 @@ def train_production_agent():
         # ====================================================================
         # LOGGING
         # ====================================================================
-        if (episode + 1) % CONFIG['log_interval'] == 0:
+        if (episode + 1) % CONFIG['monitoring']['log_interval'] == 0:
             avg_reward = np.mean(recent_rewards[-10:]) if recent_rewards else 0
             avg_steps = np.mean(recent_steps[-10:]) if recent_steps else 0
             avg_loss = np.mean(recent_losses[-10:]) if recent_losses else 0
@@ -265,19 +270,12 @@ def train_production_agent():
             
             stats = agent.get_training_stats()
             
-            print(f"\n📊 Episode {episode + 1}/{CONFIG['training_episodes']}")
-            print(f"   Reward: {total_reward:.2f} (avg: {avg_reward:.2f})")
-            print(f"   Steps: {env.current_step} (avg: {avg_steps:.1f})")
-            print(f"   Loss: {avg_loss:.4f}")
-            print(f"   Success Rate: {success_rate:.1f}%")
-            print(f"   Epsilon: {agent.epsilon:.4f}")
-            print(f"   Memory: {len(agent.memory)}/{CONFIG['buffer_size']}")
-            print(f"   Training Steps: {agent.total_steps}")
+            logging.info(f"📊 Episode {episode + 1}/{CONFIG['training_episodes']} | Reward: {total_reward:.2f} (avg: {avg_reward:.2f}) | Steps: {env.current_step} (avg: {avg_steps:.1f}) | Loss: {avg_loss:.4f} | Success Rate: {success_rate:.1f}% | Epsilon: {agent.epsilon:.4f} | Memory: {len(agent.memory)}/{agent_config['buffer_size']} | Training Steps: {agent.total_steps}")
         
         # ====================================================================
         # CHECKPOINTING
         # ====================================================================
-        if (episode + 1) % CONFIG['checkpoint_interval'] == 0:
+        if (episode + 1) % CONFIG['monitoring']['checkpoint_interval'] == 0:
             avg_reward = np.mean(recent_rewards) if recent_rewards else 0
             is_best = avg_reward > agent.best_eval_reward
             
@@ -293,28 +291,28 @@ def train_production_agent():
                 is_best=is_best
             )
             
-            print(f"\n💾 Checkpoint saved: {checkpoint_path}")
+            logging.info(f"💾 Checkpoint saved: {checkpoint_path}")
     
     # ========================================================================
     # TRAINING COMPLETE
     # ========================================================================
     training_time = time.time() - start_time
     
-    print("\n" + "="*70)
-    print("🎉 TRAINING COMPLETED")
-    print("="*70)
-    print(f"Total time: {training_time / 60:.2f} minutes")
-    print(f"Total episodes: {CONFIG['training_episodes']}")
-    print(f"Total steps: {agent.total_steps}")
-    print(f"Final success rate: {success_count / CONFIG['training_episodes'] * 100:.1f}%")
-    print(f"Best evaluation reward: {agent.best_eval_reward:.2f}")
-    print(f"Final epsilon: {agent.epsilon:.4f}")
+    logging.info("🎉 TRAINING COMPLETED")
+    logging.info(f"Total time: {training_time / 60:.2f} minutes")
+    logging.info(f"Total episodes: {CONFIG['training_episodes']}")
+    logging.info(f"Total steps: {agent.total_steps}")
+    logging.info(f"Final success rate: {success_count / CONFIG['training_episodes'] * 100:.1f}%")
+    logging.info(f"Best evaluation reward: {agent.best_eval_reward:.2f}")
+    logging.info(f"Final epsilon: {agent.epsilon:.4f}")
     
     # Get final training stats
     final_stats = agent.get_training_stats()
-    print(f"\n📈 Final Statistics:")
+    logging.info("📈 Final Statistics:")
     for key, value in final_stats.items():
-        print(f"   {key}: {value}")
+        logging.info(f"   {key}: {value}")
+
+    log_experiment(CONFIG, final_stats, f"production_checkpoints/checkpoint_episode_{CONFIG['training_episodes']}.pt")
     
     return agent
 
@@ -323,9 +321,7 @@ def evaluate_production_agent(agent):
     """
     Comprehensive evaluation on test cases.
     """
-    print("\n" + "="*70)
-    print("🎯 EVALUATION - Test Cases from Paper")
-    print("="*70)
+    logging.info("🎯 EVALUATION - Test Cases from Paper")
     
     test_cases = [
         {"name": "Easy", "target": 123, "forbidden": {23, 45, 67, 89}},
@@ -395,23 +391,13 @@ def evaluate_production_agent(agent):
         }
         results.append(result)
         
-        print(f"\n{'='*70}")
-        print(f"Test Case: {case['name']}")
-        print(f"Target: {target}, Forbidden: {forbidden}")
-        print(f"Result: {'✅ SUCCESS' if success else '❌ FAILURE'}")
-        print(f"Steps: {env.current_step}")
-        print(f"Final State: {env.current_state}")
-        print(f"Path: {' → '.join(map(str, path[:20]))}")
-        if len(path) > 20:
-            print(f"      ... ({len(path) - 20} more steps)")
+        logging.info(f"Test Case: {case['name']} | Result: {'✅ SUCCESS' if success else '❌ FAILURE'} | Steps: {env.current_step} | Final State: {env.current_state}")
     
     # Summary
     success_count = sum(1 for r in results if r['success'])
-    print(f"\n{'='*70}")
-    print(f"📊 EVALUATION SUMMARY")
-    print(f"{'='*70}")
-    print(f"Success Rate: {success_count}/{len(test_cases)} ({success_count/len(test_cases)*100:.1f}%)")
-    print(f"Average Steps: {np.mean([r['steps'] for r in results]):.1f}")
+    logging.info("📊 EVALUATION SUMMARY")
+    logging.info(f"Success Rate: {success_count}/{len(test_cases)} ({success_count/len(test_cases)*100:.1f}%)")
+    logging.info(f"Average Steps: {np.mean([r['steps'] for r in results]):.1f}")
     
     return results
 
@@ -420,9 +406,7 @@ def run_ablation_study():
     """
     Compare performance with and without each fix.
     """
-    print("\n" + "="*70)
-    print("🔬 ABLATION STUDY - Measuring Impact of Each Fix")
-    print("="*70)
+    logging.info("🔬 ABLATION STUDY - Measuring Impact of Each Fix")
     
     configs = [
         {'name': 'All Fixes', 'double_dqn': True, 'per': True, 'clip': 10.0},
@@ -432,14 +416,13 @@ def run_ablation_study():
         {'name': 'Baseline (No Fixes)', 'double_dqn': False, 'per': False, 'clip': None},
     ]
     
-    print("\n⚠️ Note: Full ablation study requires ~30 minutes.")
-    print("Running quick comparison (100 episodes each)...\n")
+    logging.info("⚠️ Note: Full ablation study requires ~30 minutes.")
+    logging.info("Running quick comparison (100 episodes each)...")
     
     results = {}
     
     for config in configs:
-        print(f"\n📝 Testing: {config['name']}")
-        print("-" * 60)
+        logging.info(f"📝 Testing: {config['name']}")
         
         agent = IndustryStandardDQNAgent(
             state_dim=12,
@@ -503,18 +486,16 @@ def run_ablation_study():
         avg_reward = np.mean(rewards)
         results[config['name']] = avg_reward
         
-        print(f"Average Reward: {avg_reward:.2f}")
+        logging.info(f"Average Reward: {avg_reward:.2f}")
     
     # Print comparison
-    print(f"\n{'='*70}")
-    print("📊 ABLATION RESULTS")
-    print(f"{'='*70}")
+    logging.info("📊 ABLATION RESULTS")
     
     baseline = results.get('Baseline (No Fixes)', 0)
     
     for name, reward in sorted(results.items(), key=lambda x: x[1], reverse=True):
         improvement = ((reward - baseline) / abs(baseline) * 100) if baseline != 0 else 0
-        print(f"{name:30s}: {reward:8.2f}  ({improvement:+.1f}%)")
+        logging.info(f"{name:30s}: {reward:8.2f}  ({improvement:+.1f}%)")
     
     return results
 
@@ -546,4 +527,4 @@ if __name__ == "__main__":
     elif args.mode == 'ablation':
         run_ablation_study()
     
-    print("\n✅ Production run complete!")
+    logging.info("✅ Production run complete!")

@@ -2,12 +2,14 @@ import math
 import numpy as np
 
 def identify_phase(gap, target):
-    """
-    Identifies the current problem-solving phase based on the gap to the target.
-    Returns a numerical representation of the phase.
-    - 0: Exploration (far from target)
-    - 1: Navigation (medium distance)
-    - 2: Precision (close to target)
+    """Identifies the problem-solving phase based on the gap to the target.
+
+    Args:
+        gap (float): The absolute difference between the current state and the target.
+        target (float): The target value.
+
+    Returns:
+        int: A numerical representation of the phase (0: Exploration, 1: Navigation, 2: Precision).
     """
     if gap > target * 0.5:
         return 0  # Exploration: Far from target
@@ -17,8 +19,10 @@ def identify_phase(gap, target):
         return 2  # Precision: Close to target
 
 def get_hierarchical_state_representation(current, target, step, max_steps, forbidden_states, action_space):
-    """
-    Computes the multi-scale relational state representation as described in the paper.
+    """Computes the multi-scale relational state representation.
+
+    This function constructs a feature vector that captures the agent's state from multiple perspectives,
+    including progress, temporal information, proximity to constraints, and strategic phase.
 
     Args:
         current (int): The current number/state.
@@ -70,8 +74,10 @@ def get_hierarchical_state_representation(current, target, step, max_steps, forb
     return state_vector
 
 def decompose_target(current, target):
-    """
-    Implements the hierarchical goal decomposition from the paper.
+    """Decomposes a target into a series of smaller, more manageable subgoals.
+
+    This function implements a simple form of hierarchical goal decomposition. For large gaps between
+    the current state and the target, it creates intermediate waypoints to guide the agent.
 
     Args:
         current (int): The current number.
@@ -99,8 +105,11 @@ def decompose_target(current, target):
     return subgoals
 
 def get_shaped_reward(current_state, next_state, target, step, is_done, info):
-    """
-    Calculates the shaped reward based on the paper's specification.
+    """Calculates a shaped reward to guide the agent's learning process.
+
+    This reward function provides more granular feedback than a simple sparse reward. It rewards
+    progress towards the target and penalizes undesirable outcomes like hitting forbidden states,
+    overshooting the target, or running out of time.
 
     Args:
         current_state (int): The state before the action.

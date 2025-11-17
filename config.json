@@ -1,0 +1,24 @@
+{
+    "training_episodes": 5000,
+    "state_dim": 12,
+    "action_dim": 3,
+    "max_steps_per_episode": 200,
+    "agent": {
+        "learning_rate": 0.0005,
+        "gamma": 0.99,
+        "epsilon_start": 1.0,
+        "epsilon_end": 0.01,
+        "epsilon_decay": 0.995,
+        "buffer_size": 50000,
+        "batch_size": 64,
+        "tau": 0.005,
+        "use_double_dqn": true,
+        "use_per": true,
+        "gradient_clip": 10.0
+    },
+    "monitoring": {
+        "checkpoint_interval": 100,
+        "eval_interval": 50,
+        "log_interval": 10
+    }
+}
