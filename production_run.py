@@ -11,13 +11,13 @@ import torch
 import time
 from datetime import datetime
 
-from mas.hr_rl.comprehensive_fix import (
+from comprehensive_fix import (
     IndustryStandardDQNAgent,
     get_fixed_shaped_reward,
     print_gap_summary
 )
-from mas.hr_rl.environment import PuzzleEnvironment
-from mas.hr_rl.core import get_hierarchical_state_representation, decompose_target
+from environment import PuzzleEnvironment
+from core import get_hierarchical_state_representation, decompose_target
 
 
 def train_production_agent():
