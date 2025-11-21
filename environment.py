@@ -1,97 +1,59 @@
+# environment.py
+import numpy as np
 import random
+from config import CONFIG
 
-class PuzzleEnvironment:
-    """
-    Implements the mathematical puzzle environment as described in the research paper.
-
-    The agent starts at 0 and must reach a target number by applying actions
-    from a fixed set, while avoiding a list of forbidden numbers.
-    """
-
-    def __init__(self, target, forbidden_states, max_steps):
-        """
-        Initializes a new puzzle environment for a single episode.
-
-        Args:
-            target (int): The target number to reach.
-            forbidden_states (set): A set of integers that the agent must avoid.
-            max_steps (int): The maximum number of steps allowed for the episode.
-        """
-        self.final_target = target
-        self.target = target # The current (sub)goal
-        self.forbidden_states = set(forbidden_states)
+class Nav1D:
+    def __init__(self, size=CONFIG["ENV_SIZE"], forbidden_frac=CONFIG["FORBIDDEN_FRAC"], max_steps=CONFIG["MAX_STEPS"]):
+        self.size = size
         self.max_steps = max_steps
-        self.action_space = [1, 3, 5]
-        
-        self.current_state = 0
-        self.current_step = 0
-        self.is_done = False
+        self.forbidden_frac = forbidden_frac
+        self.actions = [-5, -1, 0, +1, +5]
+        self.reset()
 
-    def reset(self):
-        """
-        Resets the environment to its initial state.
+    def reset(self, random_forbidden=True):
+        n_forbidden = max(1, int(self.size * self.forbidden_frac))
+        if random_forbidden:
+            self.forbidden = set(random.sample(range(self.size), n_forbidden))
+        else:
+            self.forbidden = set([self.size//2])
+        while True:
+            self.agent = random.randrange(self.size)
+            if self.agent not in self.forbidden:
+                break
+        while True:
+            self.goal = random.randrange(self.size)
+            if self.goal not in self.forbidden and self.goal != self.agent:
+                break
+        self.steps = 0
+        return self.obs()
 
-        Returns:
-            int: The initial state of the environment (always 0).
-        """
-        self.current_state = 0
-        self.current_step = 0
-        self.is_done = False
-        return self.current_state
+    def obs(self):
+        return (self.agent, self.goal, tuple(sorted(self.forbidden)))
 
-    def step(self, action):
-        """
-        Executes a single step in the environment.
+    def step(self, action_idx):
+        move = self.actions[action_idx]
+        self.steps += 1
+        newpos = int(np.clip(self.agent + move, 0, self.size-1))
+        if newpos in self.forbidden:
+            reward = -1.0
+            done = False
+            newpos = self.agent
+        else:
+            self.agent = newpos
+            reward = 0.0
+            done = False
+            if self.agent == self.goal:
+                reward = 1.0
+                done = True
+        if self.steps >= self.max_steps:
+            done = True
+        return self.obs(), reward, done, {}
 
-        Args:
-            action (int): The action to apply, which must be in the action_space.
-
-        Returns:
-            tuple: A tuple containing (next_state, done, info), where:
-                - next_state (int): The new state after applying the action.
-                - done (bool): True if the episode has ended, False otherwise.
-                - info (dict): A dictionary with auxiliary information, including
-                               'status' which can be 'SUCCESS', 'FORBIDDEN',
-                               'MAX_STEPS', or 'IN_PROGRESS'.
-        """
-        if self.is_done:
-            raise Exception("Cannot step in a completed episode. Please reset the environment.")
-
-        if action not in self.action_space:
-            raise ValueError(f"Invalid action: {action}. Must be one of {self.action_space}")
-
-        self.current_step += 1
-        self.current_state += action
-
-        info = {'status': 'IN_PROGRESS'}
-        
-        # Check for success on the current target
-        if self.current_state == self.target:
-            info['status'] = 'SUCCESS'
-            # Only terminate if the final target is reached
-            if self.current_state == self.final_target:
-                self.is_done = True
-
-        # Failure conditions always terminate the episode
-        elif self.current_state in self.forbidden_states:
-            self.is_done = True
-            info['status'] = 'FORBIDDEN'
-        elif self.current_step >= self.max_steps:
-            self.is_done = True
-            info['status'] = 'MAX_STEPS'
-        # The overshoot penalty should only apply to the final target
-        elif self.current_state > self.final_target:
-            self.is_done = True
-            info['status'] = 'OVERSHOOT'
-
-        return self.current_state, self.is_done, info
-
-    def get_state(self):
-        """Returns the current state of the environment."""
-        return {
-            'current': self.current_state,
-            'target': self.target,
-            'step': self.current_step,
-            'max_steps': self.max_steps,
-            'forbidden_states': self.forbidden_states
-        }
+    def render(self):
+        s = ['.'] * self.size
+        for f in self.forbidden:
+            s[f] = 'X'
+        s[self.goal] = 'G'
+        s[self.agent] = 'A'
+        print(''.join(s))
