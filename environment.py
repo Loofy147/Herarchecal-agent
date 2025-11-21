@@ -95,3 +95,14 @@ class PuzzleEnvironment:
             'max_steps': self.max_steps,
             'forbidden_states': self.forbidden_states
         }
+
+    def get_valid_actions(self):
+        """
+        Returns a list of valid actions from the current state.
+        """
+        valid_actions = []
+        for i, action in enumerate(self.action_space):
+            next_state = self.current_state + action
+            if next_state not in self.forbidden_states:
+                valid_actions.append(i)
+        return valid_actions

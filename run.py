@@ -3,9 +3,9 @@ import numpy as np
 import torch
 import time
 
-from mas.hr_rl.agent import DQNAgent
-from mas.hr_rl.environment import PuzzleEnvironment
-from mas.hr_rl.core import get_hierarchical_state_representation, get_shaped_reward, decompose_target
+from agent import HierarchicalAgent
+from environment import PuzzleEnvironment
+from core import get_hierarchical_state_representation, get_shaped_reward
 
 def train_agent():
     """Main function to run the training and evaluation."""
@@ -17,7 +17,7 @@ def train_agent():
     ACTION_DIM = 3  # Actions: 1, 3, 5
     MAX_STEPS_PER_EPISODE = 200 # A reasonable limit
 
-    agent = DQNAgent(state_dim=STATE_DIM, action_dim=ACTION_DIM)
+    agent = HierarchicalAgent(state_dim=STATE_DIM, action_dim=ACTION_DIM)
 
     # Curriculum Design from the paper
     curriculum = {
@@ -44,7 +44,7 @@ def train_agent():
         
         env = PuzzleEnvironment(target=target, forbidden_states=forbidden_states, max_steps=MAX_STEPS_PER_EPISODE)
         
-        subgoals = decompose_target(0, target)
+        subgoals = agent.decompose_target_hierarchically(0, target, forbidden_states)
         total_reward = 0
         
         # This variable will track if the episode ends due to failure
@@ -68,7 +68,8 @@ def train_agent():
                     forbidden_states=env_state['forbidden_states'], action_space=env.action_space
                 )
                 
-                action_idx = agent.select_action(state_representation)
+                valid_actions = env.get_valid_actions()
+                action_idx = agent.select_action(state_representation, valid_actions)
                 action_val = env.action_space[action_idx]
 
                 # The environment tells us if the episode is terminal
@@ -131,7 +132,7 @@ def evaluate_agent(agent):
         final_state = 0
         evaluation_failed = False
         
-        subgoals = decompose_target(0, target)
+        subgoals = agent.decompose_target_hierarchically(0, target, forbidden)
 
         for subgoal in subgoals:
             env.target = subgoal
@@ -145,7 +146,8 @@ def evaluate_agent(agent):
                     forbidden_states=env_state['forbidden_states'], action_space=env.action_space
                 )
                 
-                action_idx = agent.select_action(state_representation)
+                valid_actions = env.get_valid_actions()
+                action_idx = agent.select_action(state_representation, valid_actions)
                 action_val = env.action_space[action_idx]
                 
                 next_state, is_terminal, info = env.step(action_val)

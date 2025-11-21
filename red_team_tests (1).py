@@ -12,7 +12,7 @@ import pytest
 import sys
 import os
 
-from agent import DQNAgent as OriginalAgent
+from agent import HierarchicalAgent as OriginalAgent
 from comprehensive_fix import IndustryStandardDQNAgent, get_fixed_shaped_reward, print_gap_summary
 from environment import PuzzleEnvironment
 from core import get_hierarchical_state_representation
@@ -63,7 +63,7 @@ class TestGap0_DoubleDQN:
         # Test action consistency on same state
         test_state = np.random.randn(STATE_DIM)
         
-        vanilla_actions = [vanilla_agent.select_action(test_state) for _ in range(10)]
+        vanilla_actions = [vanilla_agent.select_action(test_state, [0, 1, 2]) for _ in range(10)]
         double_actions = [double_agent.select_action(test_state) for _ in range(10)]
         
         vanilla_consistency = len(set(vanilla_actions))

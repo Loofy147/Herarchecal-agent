@@ -28,9 +28,14 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.memory)
 
-class DQNAgent:
-    """The agent that learns to solve the mathematical puzzle."""
-    def __init__(self, state_dim, action_dim, learning_rate=0.0005, gamma=0.99, epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995, buffer_size=10000, batch_size=64, tau=0.005):
+class HierarchicalAgent:
+    """
+    A hierarchical agent that uses constraint-aware subgoal decomposition to solve complex tasks.
+    """
+    def __init__(self, state_dim, action_dim, learning_rate=0.0005, gamma=0.99,
+                 epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995,
+                 buffer_size=10000, batch_size=64, tau=0.005):
+
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.gamma = gamma
@@ -40,6 +45,13 @@ class DQNAgent:
         self.batch_size = batch_size
         self.tau = tau
 
+        # --- Thresholds ---
+        self.proximity_threshold = 10
+        self.distance_threshold = 50
+        self.exploration_threshold = 0.5
+        self.precision_threshold = 5
+        self.min_zone_size = 10 # For subgoal decomposition
+
         self.policy_net = HierarchicalQNetwork(state_dim, action_dim)
         self.target_net = HierarchicalQNetwork(state_dim, action_dim)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -48,15 +60,95 @@ class DQNAgent:
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
         self.memory = ReplayBuffer(buffer_size)
 
-    def select_action(self, state):
-        """Selects an action using an epsilon-greedy policy."""
+    def select_action(self, state, valid_actions):
+        """
+        Selects an action using an epsilon-greedy policy, but with constraint awareness.
+        """
+        if not valid_actions:
+            return self.emergency_backtrack_action()
+
         if random.random() < self.epsilon:
-            return random.randrange(self.action_dim)
+            return random.choice(valid_actions)
         else:
             with torch.no_grad():
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
                 q_values, _ = self.policy_net(state_tensor)
-                return q_values.argmax().item()
+
+                # Mask out invalid actions
+                masked_q_values = q_values.clone()
+                for i in range(self.action_dim):
+                    if i not in valid_actions:
+                        masked_q_values[0, i] = -float('inf')
+
+                return masked_q_values.argmax().item()
+
+    def emergency_backtrack_action(self):
+        """
+        Defines a safe action to take when no other valid moves are available.
+        """
+        # A simple but effective strategy: move back by the smallest possible step.
+        # This assumes that the action space is ordered [move_1, move_3, move_5, ...]
+        return 0 # Corresponds to the smallest action
+
+    def decompose_target_hierarchically(self, current, target, forbidden_states):
+        """
+        Adaptive decomposition that respects constraints by creating subgoals in safe zones.
+        """
+        if not forbidden_states or abs(target - current) < self.distance_threshold:
+            return [target]
+
+        safe_zones = self._identify_safe_zones(current, target, forbidden_states)
+
+        subgoals = []
+        last_pos = current
+
+        for zone_start, zone_end in safe_zones:
+            # Add the start of the safe zone as a subgoal
+            if zone_start != last_pos:
+                subgoals.append(zone_start)
+
+            # Decompose within the safe zone if it's large enough
+            zone_size = abs(zone_end - zone_start)
+            if zone_size > self.min_zone_size:
+                # Add a subgoal in the middle of the safe zone
+                subgoal = (zone_start + zone_end) // 2
+                subgoals.append(subgoal)
+
+            # The end of the zone will be the start of the next or the target
+            last_pos = zone_end
+
+        subgoals.append(target)
+
+        # Remove redundant subgoals and ensure sorted order
+        final_subgoals = []
+        for subgoal in sorted(subgoals):
+            if subgoal != current and (not final_subgoals or subgoal != final_subgoals[-1]):
+                final_subgoals.append(subgoal)
+
+        return final_subgoals
+
+    def _identify_safe_zones(self, current, target, forbidden):
+        """Identifies contiguous safe zones between current and target."""
+        direction = 1 if target > current else -1
+        path = range(min(current, target), max(current, target) + 1)
+
+        sorted_forbidden = sorted([f for f in forbidden if f in path])
+
+        if not sorted_forbidden:
+            return [(current, target)]
+
+        zones = []
+        zone_start = current
+
+        for f_state in sorted_forbidden:
+            if zone_start * direction < f_state * direction:
+                zones.append((zone_start, f_state - direction))
+            zone_start = f_state + direction
+
+        if zone_start * direction <= target * direction:
+            zones.append((zone_start, target))
+
+        return zones
 
     def train_step(self):
         """Performs a single training step on a batch of experiences."""
